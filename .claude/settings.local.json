@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//data/data/com.termux/files/home/Aisha_Round18_Backup/**)",
+      "Read(//data/data/com.termux/files/home/Aisha_Round18_Repair/**)",
+      "Bash(pkg search *)"
+    ]
+  }
+}

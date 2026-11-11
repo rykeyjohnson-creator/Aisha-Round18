@@ -1,0 +1,287 @@
+package com.jarvis.assistant.automation.accessibility
+
+import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.graphics.Path
+import android.graphics.Rect
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
+import android.graphics.Bitmap
+import android.view.Display
+import java.io.ByteArrayOutputStream
+import java.util.Locale
+import java.util.concurrent.Executors
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.text.Regex
+
+/**
+ * Accessibility Service for JARVIS Aisha.
+ * Provides accessibility features, OTP extraction, and automation capabilities.
+ */
+class JarvisAccessibilityService : AccessibilityService() {
+
+    companion object {
+        private const val TAG = "JarvisAccessibility"
+        private val _uiChanges = MutableStateFlow(UiChange(0L, "", 0, 0L))
+        val uiChanges: StateFlow<UiChange> = _uiChanges.asStateFlow()
+
+        @Volatile
+        var instance: JarvisAccessibilityService? = null
+            private set
+
+        fun isRunning(): Boolean = instance != null
+        fun isEnabled(): Boolean = instance != null
+
+        fun triggerWhatsAppSend(targetText: String? = null) {
+            instance?.armWhatsAppSend(targetText)
+        }
+
+        fun triggerWhatsAppCall(isVideo: Boolean) {
+            instance?.armWhatsAppCall(isVideo)
+        }
+
+        data class UiChange(val revision: Long, val packageName: String, val eventType: Int, val timestamp: Long)
+    }
+
+    private var latestExtractedOtp: ExtractedOtp? = null
+        private set
+
+    data class ExtractedOtp(
+        val otp: String,
+        val timestamp: Long
+    )
+
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+        Log.i(TAG, "JarvisAccessibilityService created")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        instance = null
+        Log.i(TAG, "JarvisAccessibilityService destroyed")
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event == null) return
+
+        try {
+            // Update UI change timestamp for any event
+            _uiChanges.value = UiChange(
+                System.currentTimeMillis(),
+                event.packageName?.toString() ?: "",
+                event.eventType,
+                System.currentTimeMillis()
+            )
+
+            // Extract OTP from text events
+            if (event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED ||
+                event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED ||
+                event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED) {
+
+                val source = event.source
+                if (source != null) {
+                    val text = source.text
+                    if (text != null && text.isNotBlank()) {
+                        val otpMatch = Regex("\\b\\d{4,6}\\b").find(text)
+                        if (otpMatch != null) {
+                            latestExtractedOtp = ExtractedOtp(otpMatch.value, System.currentTimeMillis())
+                            Log.i(TAG, "OTP extracted: ${otpMatch.value}")
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing accessibility event: ${e.message}", e)
+        }
+    }
+
+    // --- Safe node search methods with depth limits to prevent stack overflow ---
+
+    /**
+     * Find a node by text with recursion depth limit.
+     *
+     * @param node   The root node to search from
+     * @param text   The text to search for
+     * @param exact  Whether to match exactly or contain
+     * @param maxDepth Maximum recursion depth (default 15)
+     * @return The first matching node or null
+     */
+    fun findNodeByText(node: AccessibilityNodeInfo?, text: String, exact: Boolean = false, maxDepth: Int = 15): AccessibilityNodeInfo? {
+        if (node == null) return null
+        return findNodeByTextRecursive(node, text, exact, 0, maxDepth)
+    }
+
+    private fun findNodeByTextRecursive(
+        node: AccessibilityNodeInfo,
+        text: String,
+        exact: Boolean,
+        depth: Int,
+        maxDepth: Int
+    ): AccessibilityNodeInfo? {
+        if (depth > maxDepth) return null
+
+        val nodeText = node.text?.toString()?.trim() ?: ""
+        val matches = if (exact) nodeText.equals(text, ignoreCase = true) else nodeText.contains(text, ignoreCase = true)
+
+        if (matches && node.isVisibleToUser) {
+            return node
+        }
+
+        // Search children
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val result = findNodeByTextRecursive(child, text, exact, depth + 1, maxDepth)
+            if (result != null) return result
+        }
+
+        return null
+    }
+
+    /**
+     * Find all nodes matching text with visited set prevention to avoid infinite loops.
+     *
+     * @param node   The root node to search from
+     * @param text   The text to search for
+     * @param exact  Whether to match exactly or contain
+     * @param maxDepth Maximum recursion depth (default 15)
+     * @return List of all matching nodes
+     */
+    fun findAllNodesByText(node: AccessibilityNodeInfo?, text: String, exact: Boolean = false, maxDepth: Int = 15): List<AccessibilityNodeInfo> {
+        val results = mutableListOf<AccessibilityNodeInfo>()
+        val visited = mutableSetOf<AccessibilityNodeInfo>()
+        if (node != null) {
+            collectAllNodesByText(node, text, exact, 0, maxDepth, results, visited)
+        }
+        return results
+    }
+
+    private fun collectAllNodesByText(
+        node: AccessibilityNodeInfo,
+        text: String,
+        exact: Boolean,
+        depth: Int,
+        maxDepth: Int,
+        results: MutableList<AccessibilityNodeInfo>,
+        visited: MutableSet<AccessibilityNodeInfo>
+    ) {
+        if (depth > maxDepth || !visited.add(node)) return
+
+        val nodeText = node.text?.toString()?.trim() ?: ""
+        val matches = if (exact) nodeText.equals(text, ignoreCase = true) else nodeText.contains(text, ignoreCase = true)
+
+        if (matches && node.isVisibleToUser) {
+            results.add(node)
+        }
+
+        // Search children
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            collectAllNodesByText(child, text, exact, depth + 1, maxDepth, results, visited)
+        }
+    }
+
+    /**
+     * Safely traverse the accessibility node tree with depth limit and visited set.
+     *
+     * @param node    The root node to traverse
+     * @param maxDepth Maximum recursion depth (default 20)
+     * @param action  The action to perform on each node
+     */
+    fun traverseSafe(node: AccessibilityNodeInfo?, maxDepth: Int = 20, action: (AccessibilityNodeInfo) -> Unit) {
+        if (node == null) return
+        val visited = mutableSetOf<AccessibilityNodeInfo>()
+        traverseSafeRecursive(node, 0, maxDepth, action, visited)
+    }
+
+    private fun traverseSafeRecursive(
+        node: AccessibilityNodeInfo,
+        depth: Int,
+        maxDepth: Int,
+        action: (AccessibilityNodeInfo) -> Unit,
+        visited: MutableSet<AccessibilityNodeInfo>
+    ) {
+        if (depth > maxDepth || !visited.add(node)) return
+
+        try {
+            action(node)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error in traverse action: ${e.message}")
+        }
+
+        // Traverse children
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            traverseSafeRecursive(child, depth + 1, maxDepth, action, visited)
+        }
+    }
+
+    // --- WhatsApp specific methods (simplified placeholders) ---
+
+    private fun armWhatsAppSend(targetText: String? = null) {
+        Log.i(TAG, "Arming WhatsApp send with text: $targetText")
+        // TODO: Implement actual WhatsApp send automation
+    }
+
+    private fun armWhatsAppCall(isVideo: Boolean) {
+        Log.i(TAG, "Arming WhatsApp call (video=$isVideo)")
+        // TODO: Implement actual WhatsApp call automation
+    }
+
+    // --- Helper methods ---
+
+    /** Get the active root node from the accessibility service. */
+    fun getActiveRootNode(): AccessibilityNodeInfo? {
+        return rootInActiveWindow
+    }
+
+    /** Get the application root node. */
+    fun getAppRootNode(): AccessibilityNodeInfo? {
+        return getActiveRootNode()
+    }
+
+    /** Get the most recently extracted OTP. */
+    fun getRecentOtp(): String? {
+        return latestExtractedOtp?.otp
+    }
+
+    /** Take a screen capture (placeholder). */
+    fun takeScreenCapture(callback: (Bitmap) -> Unit) {
+        // TODO: Implement actual screen capture
+        Log.w(TAG, "takeScreenCapture not implemented")
+    }
+
+    /** Perform a system gesture. */
+    fun performSystemGesture(gesture: String): Boolean {
+        return when (gesture.lowercase()) {
+            "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
+            "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
+            "recents" -> performGlobalAction(GLOBAL_ACTION_RECENTS)
+            "notifications" -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+            else -> false
+        }
+    }
+
+    // --- Nested classes ---
+
+    data class UiChange(val revision: Long, val packageName: String, val eventType: Int, val timestamp: Long)
+}

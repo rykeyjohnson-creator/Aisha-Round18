@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/themeBg">
+
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="16dp"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_jarvis_icon_square"
+            android:src="@drawable/ic_back"
+            app:tint="?attr/themeTextPrimary"
+            android:contentDescription="Back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:text="Pin Studio"
+            android:textColor="?attr/themeTextPrimary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:padding="16dp"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <EditText
+                android:id="@+id/etNiche"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Niche/topic, e.g. 'keto recipes'…"
+                android:background="@drawable/bg_jarvis_icon_square"
+                android:padding="12dp"
+                android:textColor="?attr/themeTextPrimary"
+                android:textColorHint="@color/text_muted" />
+
+            <Button
+                android:id="@+id/btnResearch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Research what's trending" />
+
+            <TextView
+                android:id="@+id/tvTrends"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_jarvis_icon_square"
+                android:padding="12dp"
+                android:textColor="?attr/themeTextPrimary"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <EditText
+                android:id="@+id/etPinIdea"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minLines="2"
+                android:maxLines="4"
+                android:gravity="top"
+                android:layout_marginTop="14dp"
+                android:hint="Your pin idea (inspired by the trends above, in your own words)…"
+                android:background="@drawable/bg_jarvis_icon_square"
+                android:padding="12dp"
+                android:textColor="?attr/themeTextPrimary"
+                android:textColorHint="@color/text_muted" />
+
+            <Button
+                android:id="@+id/btnGeneratePin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Generate original pin + SEO" />
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/status_red"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/ivPin"
+                android:layout_width="match_parent"
+                android:layout_height="280dp"
+                android:layout_marginTop="14dp"
+                android:scaleType="fitCenter"
+                android:background="@drawable/bg_jarvis_icon_square"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btnSaveImage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Save image"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvSeoLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="SEO package"
+                android:textColor="?attr/themeTextPrimary"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvSeo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_jarvis_icon_square"
+                android:padding="12dp"
+                android:textIsSelectable="true"
+                android:textColor="?attr/themeTextPrimary"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btnCopySeo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Copy SEO text"
+                android:visibility="gone" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="This creates an original image and SEO text inspired by current trends — it does not copy anyone else's pin. Posting directly to Pinterest/Facebook isn't wired up yet; that needs your own Pinterest/Meta developer app credentials. For now, save the image and SEO text here and post manually."
+                android:textColor="@color/text_muted"
+                android:textSize="11sp" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
